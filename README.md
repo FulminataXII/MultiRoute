@@ -15,11 +15,10 @@ Written in C++17 on top of WASAPI, with a Dear ImGui frontend.
 
 - **Several devices at once** — any number of active output endpoints, all fed from the same capture.
 - **Clock sync** — no two device clocks run at exactly the same speed, so one gradually gets ahead of the others. Each device has a control loop watching how far its buffer has drifted from target and nudging its sample rate to compensate.
-- **Per-device delay** — one output can be pushed later than the rest, in milliseconds, which helps when something like a Bluetooth speaker lags behind wired headphones. Changeable while audio is playing.
+- **Per-device delay** — one output can be delayed than the rest which helps when something like a Bluetooth speaker lags behind wired headphones. Changeable while audio is playing.
 - **Per-device volume** — separate levels, also changeable mid-playback.
 - **Live telemetry** — buffer fill, applied clock rate, controller error and fault counts, per device.
-- **Structured logs** — every event has a fixed numeric ID and a severity you can filter on.
-- **Experiment mode** — a named session gets recorded to a log file: the settings you picked plus the telemetry over time, across as many steps as you want. It's there so you can compare runs afterwards instead of tuning by ear.
+- **Experiment mode** — a named session gets recorded to a log file: the settings you picked plus the telemetry over time, across as many steps as you want. It's to help you compare runs afterwards instead of tuning just by ear.
 
 ---
 
@@ -29,35 +28,37 @@ Written in C++17 on top of WASAPI, with a Dear ImGui frontend.
 flowchart TD
     UI["Frontend (GUI or CLI)"]
     SUP["Supervisor thread<br/>owns every COM object<br/>start / stop / fault watchdog"]
-
+ 
     UI -- "commands" --> SUP
     SUP -- "telemetry snapshots + logs" --> UI
-
+ 
     CAP["Capture thread<br/>loopback from default device<br/><i>realtime</i>"]
     SUP --> CAP
-
+ 
     RA["Render thread A<br/><i>realtime</i>"]
     RB["Render thread B<br/><i>realtime</i>"]
     SUP --> RA
     SUP --> RB
-
+ 
     RINGA["SPSC ring buffer A"]
     RINGB["SPSC ring buffer B"]
-
+ 
     CAP -- "produces" --> RINGA
     CAP -- "produces" --> RINGB
     RINGA -- "consumes" --> RA
     RINGB -- "consumes" --> RB
-
+ 
     CTLA["Control thread A<br/>drift correction"]
     CTLB["Control thread B<br/>drift correction"]
     RINGA -. "fill level" .-> CTLA
     RINGB -. "fill level" .-> CTLB
     CTLA -. "sample rate" .-> RA
     CTLB -. "sample rate" .-> RB
+ 
+    linkStyle 2,3,4,5,6,7,8,9,10,11,12 interpolate linear
 ```
 
-The audio path and the control path don't share anything that can block. Audio threads never take a lock or allocate; the control and UI side do both freely.
+The audio path and the control path don't share anything that can block them. Audio threads will never take a lock or allocate; the control and UI side do both freely.
 
 ### Files
 
@@ -65,14 +66,14 @@ The audio path and the control path don't share anything that can block. Audio t
 src/
   AudioEngine.h/.cpp        Engine API and all the WASAPI code. The header has no Windows types in it.
   AudioRingBuffer.h         Lock-free SPSC byte FIFO.
-  ClockDriftController.h    The drift correction maths. No platform code, so it can be tested on its own.
+  ClockDriftController.h    The drift correction math. 
   Logging.h                 Lock-free MPMC queue plus a drain thread. Safe to call from audio threads.
   ExperimentRecorder.h/.cpp Session recording. Only uses the public engine API.
   main_gui.cpp              ImGui frontend.
   main_cli.cpp              Console frontend.
-  HelpText.h                In-app glossary. Plain data, editable without touching UI code.
-third_party/imgui/          Dear ImGui (cloned separately, see below)
-build/                      Generated. build/MultiMuxGui.exe is what you ship.
+  HelpText.h                In-app glossary. Plain data, editable without changing the UI code.
+third_party/imgui/          Dear ImGui source (cloned separately, see below)
+build/                      Generated. build/MultiMuxGui.exe is the self-contained app.
 ```
 
 ---
